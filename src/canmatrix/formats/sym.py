@@ -104,20 +104,11 @@ def create_signal(db, signal):  # type: (canmatrix.CanMatrix, canmatrix.Signal) 
     global enums
     global enum_dict
     output = ""
-    if signal.name.isidentifier():
-        output += "Var=%s " % signal.name
+    output += "Var=%s " % signal.name
+    if not signal.is_signed:
+        output += "unsigned "
     else:
-        output += 'Var="%s" ' % signal.name
-    if signal.type_label:
-        output += signal.type_label + " "
-    else:
-        if signal.is_signed:
-            output += "signed "
-        elif signal.is_float:
-            output += "float "
-        else:
-            output += "unsigned "
-
+        output += "signed "
     start_bit = signal.get_startbit()
     if not signal.is_little_endian:
         # Motorola
@@ -428,33 +419,29 @@ def load(f, **options):  # type: (typing.IO, **typing.Any) -> canmatrix.CanMatri
                     sig_name = temp_array[0]
 
                     is_float = False
-                    is_ascii = False
                     if index_offset != 1:
                         is_signed = True
                     else:
                         is_signed = False
 
-                        type_label = temp_array[1]
-
-                        if not type_label.isidentifier():
-                            print(type_label)
-                            print()
-
-                        if type_label == 'unsigned':
+                        if temp_array[1] == 'unsigned':
                             pass
-                        elif type_label == 'bit':
+                        elif temp_array[1] == 'bit':
+                            # TODO: actually support bit instead of interpreting as
+                            # an unsigned
                             pass
-                        elif type_label == 'raw':
-                            pass
-                        elif type_label == 'signed':
+                        elif temp_array[1] == 'signed':
                             is_signed = True
-                        elif type_label in ['float', 'double']:
+                        elif temp_array[1] in ['float', 'double']:
                             is_float = True
-                        elif type_label in ['char', 'string']:
-                            is_ascii = True
-                            pass
+                        elif temp_array[1] in ['string']:
+                            # TODO: actually support these variable types instead
+                            # of skipping
+                            print('Variable type \'{}\' found and skipped'
+                                  .format(temp_array[1]))
+                            continue
                         else:
-                            raise ValueError('Unknown type \'{}\' found'.format(type_label))
+                            raise ValueError('Unknown type \'{}\' found'.format(temp_array[1]))
 
                     start_bit = int(temp_array[index_offset + 1].split(',')[0])
                     signal_length = int(temp_array[index_offset + 1].split(',')[1])
@@ -534,7 +521,6 @@ def load(f, **options):  # type: (typing.IO, **typing.Any) -> canmatrix.CanMatri
                                 is_little_endian=intel,
                                 is_signed=is_signed,
                                 is_float=is_float,
-                                is_ascii=is_ascii,
                                 factor=factor,
                                 offset=offset,
                                 unit=unit,
@@ -574,7 +560,6 @@ def load(f, **options):  # type: (typing.IO, **typing.Any) -> canmatrix.CanMatri
                             unit=unit,
                             multiplex=multiplexor,
                             comment=comment,
-                            type_label=type_label,
                             **extras)
                         if min_value is not None:
                             signal.min = float_factory(min_value)
