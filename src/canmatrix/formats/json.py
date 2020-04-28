@@ -45,11 +45,8 @@ def dump(db, f, **options):
     additional_frame_columns = [x for x in options.get("additionalFrameAttributes", "").split(",") if x]
 
 
-    export_dict = {}
-    if export_all:
-        export_dict['enumerations'] = db.value_tables
+    export_array = []  # type: typing.List[typing.Union[str, float, list, dict]]
 
-    export_dict['messages'] = []
 
     if export_canard:
         for frame in db.frames:
@@ -63,7 +60,7 @@ def dump(db, f, **options):
                     "bit_length": signal.size,
                     "factor": signal.factor,
                     "offset": signal.offset}
-            export_dict['messages'].append(
+            export_array.append(
                 {"name": frame.name, "id": hex(frame.arbitration_id.id), "signals": signals})
 
     elif export_all is False:
@@ -101,7 +98,7 @@ def dump(db, f, **options):
             }
             if frame_attributes:  # only add attributes if there are any
                 symbolic_frame["attributes"] = frame_attributes
-            export_dict['messages'].append(symbolic_frame)
+            export_array.append(symbolic_frame)
     else:  # export_all
         for frame in db.frames:
             frame_attributes = {attribute: frame.attribute(attribute, db=db) for attribute in db.frame_defines}
@@ -142,7 +139,7 @@ def dump(db, f, **options):
                     symbolic_signal["unit"] = signal.unit
                 symbolic_signals.append(symbolic_signal)
 
-            export_dict['messages'].append(
+            export_array.append(
                 {"name": frame.name,
                  "id": int(frame.arbitration_id.id),
                  "is_extended_frame": frame.arbitration_id.extended,
@@ -157,7 +154,7 @@ def dump(db, f, **options):
         temp = f
 
     try:
-        json.dump(export_dict, temp, sort_keys=True,
+        json.dump({"messages": export_array}, temp, sort_keys=True,
                   indent=4, separators=(',', ': '))
     finally:
         if sys.version_info > (3, 0):
@@ -177,13 +174,6 @@ def load(f, **_options):
     else:
 
         json_data = json.load(f)
-
-    if "enumerations" in json_data:
-        for val_tab_name, val_tab_dict in json_data['enumerations'].items():
-            for key, val in val_tab_dict.items():
-                if key.isdigit():
-                    key = int(key)
-                db.value_tables.setdefault(val_tab_name, {})[key] = val
 
     if "messages" in json_data:
         for frame in json_data["messages"]:
@@ -206,8 +196,8 @@ def load(f, **_options):
                     is_little_endian=is_little_endian,
                     is_signed=is_signed,
                     is_float=is_float,
-                    factor=signal.get("factor", 1),
-                    offset=signal.get("offset", 0)
+                    factor=signal["factor"],
+                    offset=signal["offset"]
                 )
 
                 if signal.get("min") is not None:
